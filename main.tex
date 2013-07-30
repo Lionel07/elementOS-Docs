@@ -1,0 +1,198 @@
+\documentclass[12pt]{article}
+
+%Includes
+\usepackage{color}
+
+%Title
+\title{elementOS Design Document}
+\author{Corwin McKnight}
+
+
+\begin{document}
+\maketitle
+\tableofcontents
+\clearpage
+\section{Preamble}
+This document describes in great detail the inner workings of the elementOS operating system. It currently is not in working condition, is not in any way stable. The document is currently in development, and edits are welcome. The document will have technical english. If you are looking for a general overview, it does not exist. Attempt to read this. If bengal tigers are in your room, have them attempt to read this; I am \emph{curious}. This document describe the intricate workings of both the operating system, and the kernel. Each is divided by the section header Kernel. Why are you still reading.
+
+\section{Introducion}
+element\footnote{By element, I mean the OS.} is a project to create a operating system that incorporates modern ideas and algorithms, while still supporting older machines. It is completely backwards compatible (strlen for i7 can degrade into a strlen for a \emph{8086}\footnote{(yeah, I know it's slow)}). elementOS is supposed to be a fast, open source operating system with UNIX-like functionality. The project will be split into two parts: the Kernel(113) and the Operating System(element). Each will be discussed in brief in the following paragraphs.
+
+Ununtrium, the kernel that powers elementOS, will be developed in C for this project. It will be a Hybrid kernel that acts more like a Microkernel. It will also support multiple architectures.  Ununtrium will support kernel modules to extend the kernel without recompiling. It will also have special kernel servers that run in kernel space that can actually replace the code for some kernel functions. In other words, they are like libraries the kernel directly calls. 113 will also support heavy recovery support, so if something is damaged, the kernel can repair the file system/boot to a good known state(See initramfs). And if the kernel is damaged, kernel-level verified boot will fail, and force it to either not work, or prompt to be repaired.
+
+For element, it's mostly just a toy OS. It serves no other purpose than being a research experience. If it proves sucessfull, it will undoubltly be continued in a more serious fashion. It in itself is infact a learning experience, already in its 9th incarnation.
+\section{Design}
+For element
+\subsection{Ununtrium}
+Ununtrium will be divided into namespaces which act like components, and are called packages. The table below will list the packages and their purposes. Some can be overwritten and extended.
+\subsubsection{Packages}
+Packages
+
+
+\noindent\begin{tabular}{|l|l|}
+\hline
+    Package & Function\\
+  \hline
+    Memory & Manages memory, virtual memory, and the like.\\
+  IOSys & Manages all communications, software and hardware\\
+	Cerberus & Manages all process times. Has a niceness value and modes.\\
+	Arch & Architecture Specific Code\\
+	KMod & Manages modules. Controls runtime permissions, \\&their run time, privileges, and when they are run.\\
+	Lock & Manages the locks (and keys) in the kernel. \\& communicates (via IOSys) with ProcessScheduler alot\\
+	VFS & Manages the file system\\
+	Devices & Manages devices.\\
+	\hline
+\end{tabular}
+\subsubsection{File Hierarchy}
+
+\begin{tabular}{|l|l|}
+\hline
+Location & Contains \\
+\hline
+/ & Root of File System \\
+/dev & Holds device file handles\\
+/Volumes & Holds mounted file systems (besides the root file system)\\
+/Applications & Binary program files\\
+/sbin & System binary files\\
+/usr/bin & User binary files\\
+/Library & Holds data and configuration files for system level applications\\
+/usr/Library & Holds data and configuration files for user level applications\\
+\hline
+\end{tabular}
+\section{Behavioral Standards}
+Every part of element (including 113) must adhere to the following \emph{guidelines}. Can only be broken by putting a comment in the related source file with a good reason why it has been broken.
+\begin{itemize}
+  \item Must be for benefit of the end user
+  \item Must not kill humans
+  \item Must have a useful purpose for all clients (if not, then it belongs as a compile time addition)
+  \item Does not bloat the kernel
+  \item In addition, does not excessively slow the kernel
+  \item Does not compromise the security of the user (without their permission (e.g. root))
+\end{itemize}
+
+\section{Kernel}
+The kernel is a complex (but fast) executable. Highly optimised, it can perform many functions.
+\subsection{API}
+The API across all architectures is very general and standerdised. It does not exist yet.
+\subsection{Explicitly Defined Flags}
+The kernel has a section for flags that define it's properties. It is not dynamic untill the heap is setup, and some are hardcoded (They are RO: ReadOnly). The PropertyStore works like this:
+\subsubsection{PropertyStore}
+The property store is an array of keys (The name of the property) and the data. They are stored as \verb"property_propstore_t":
+
+\begin{tabular}{ll}
+\hline
+Property & Purpose \\
+\hline
+\verb"char* key" & Name\\
+\verb"int id" & Internal Id Number\\
+\verb"void* data" & Address to malloc()'d data\\
+\verb"int data_size" & sizeof(data)\\
+\hline
+\end{tabular}
+\subsubsection{All surely defined items}
+
+\begin{tabular}{lll}
+\hline
+RO & Name & Purpose \\
+\hline
+X & KVER & Kernel Version  \\
+X & KNAME & Kenrel Codename \\
+\hline
+\end{tabular}
+\subsection{Options}
+The kernel has certain options that are set by \verb+make configuration+ that define static compiler variables. They enable, disable, limit, replace, switch, or free diffrent functions of the kernel. They are passed to the kernel as compile time switches in clang. They might have a data value, but most of the time them just existing is enough:
+
+\begin{tabular}{|l|l|l|}
+\hline
+Data & Name & Purpose \\
+\hline
+
+String & \verb+ARCH+ & The current arch to build code for \\
+ & & Format:Super-Model (x86-64-i7) \\
+\hline
+
+None & \verb+NO_PROGRESSBAR+ & Disables progress bars  \\
+\hline
+
+None & \verb+NO_KERNEL_JOURNAL+ & Removes the replay journal from the kernel \\
+\hline
+
+None & \verb+NO_CRYPTO_CEBERUS+ & Disables Cerberus\\
+\hline
+
+None & \verb+NO_VT+ & Forces one terminal (the physical one)\\
+\hline
+
+None & \verb+ENABLE_DEBUG+ & Enables debug messages \\
+\hline
+
+None & \verb+RIGID_FUNCTIONS+ & Forces selector functions to call arch specifc code\\
+\hline
+
+None & \verb+PROPSTORE_RIGID+ & Forces the PropStore to be Read Only\\
+\hline
+
+String & \verb+DEVMODE+ & All Restrictions Lifted, needs binary key module\\
+\hline
+
+\end{tabular}
+\subsection{Functions}
+The kernel has a specif list of things it can do, it's functions. There are alot of them, some architecture specific, some for devices. Here are some of the main functions:
+\subsubsection{Journaled initramfs}
+The journaled initramfs is for the benefit of the boot process. The initramfs itself is not journaled, that would be redundant. Because the kernel is updated with each change to it, it would be a good idea to keep a \emph{backup} in kernel, incase of a missing initram. So a journal is kept of either a bootstrap initramfs, or a old-known-to-work-version. If 113 can't find the initramfs on boot, it replays the journal on a ramdisk created by the vfs (that exists on the file volume. This can be disabled for smaller kernels with disable-backup-initramfs=1 passed to make
+\subsubsection{VFS}
+The vfs is a mount point based tree. The tree starts with the root (/). The root directory is loaded with the partition that holds the /System directory. Usually sda1. A swap partition is mounted at /.swap(a,b,c). In each mount point, there are a collection of inodes, each with a parent and a child id. The file system driver is called each access not from cache.
+\subsubsection{Compile-time Architecture Optimisations}
+Make does something wonderful. It passes the ARCH variable to clang as a preprocessor directive. Because it does this, the kernel can optimise based on the architecture.
+
+For dynamic functions, they have a \emph{selector} function \verb+(like strlen)+. This, based on the architecture calls on the \emph{real} function \verb+(strlen_i7).+. This makes the function significantly better.
+
+For a function that will be called hundreds (or \textbf{millions}) of times per second, we have a rigid selector. This requires special compile time options (\verb+COMP_RIGIDFUNCTIONS+ which is paired with \verb+ARCH=arch+) that force the compiler (\underline{clang}) to use a specific version of a function. In the case of the example, it would compile for the \emph{i7} \emph{processor}, regardless of the selected architecture. This works in the case of backwards compatibility (setting the arch as a 8086,as a i7 can run 8086 instructions), but sadly not the reverse (a 8086 can't run i7 instructions. This is obvioulsy bad, because as soon as the kernel does a illegal instruction, the kernel crashes, catches itself, then halts.
+
+This get even more bad if a illegal operation occures before the IDT is initialised. So, when executing a function, it will default to 8086 code when either there is no IDT, or the Arch is unknown by using a switch statement/table for all versions, and the default will be the most compatible. This is useful when there is no optimised version of the function.
+
+\subsubsection{Virtual Terminals}
+Virtual terminals (as seen by the VFS) are just files that are treated as screens. Residing in \emph{/dev}, they are simply part of the filesystem. But the kernel treats them as a terminal. Each virtual terminal has a size(in bytes), lenght, and width. 
+Size is calculated by: 
+\[S=l\times w\] 
+The v.t. also have a position(represented by the cursor position). It is calculated by:
+\[p=80y + x\]
+The original x and y are still stored.
+
+The kernel can switch to a terminal and transfer its output onto the screen. It currently runs at 80 by 24 text mode, which the equation \(b=80*24\) shows us, has only \(b=1920\) charaters; which isn't alot. It is presented in a scroll-type window (using pgup and pgdown).
+\subsubsection{Watchdog (Cerberus)}
+Cerberusd is the watchdog daemon of the system, using an API to access Cerberus. It has an internal list of all system level processes, and if cerberusd sees that any one of them is killed, it will restart it. krestartguard, however is the actual hardware watchdog designation.
+\section{Building}
+Building and compiling element uses make. It first passes through.
+\subsection{Prerequisites}
+To make the kernel (with full functionality) there are some prerequisites that are required
+\begin{itemize}
+	\item make 
+	\item nasm (assembler)
+	\item clang (compiler)
+	\item binutils (build in ./tools)
+	\item gcc
+	\item flex
+	\item bison
+	\item libgmp3-dev; libmpfr-dev; libmpc-dev; libmpc-dev
+	\item genisoimage 
+	\item doxygen
+\end{itemize}
+\subsubsection{APT}
+To install all prerequisites, do a:
+TODO
+\subsection{Building the cross compiler}
+The cross compiler is gcc, compiling for i586-elf. It is built by executing:
+
+cd [Project Directory]
+
+cd tool
+
+./makebinutils.sh
+
+\noindent The i586-elf-gcc binutils should be built now.
+\subsection{Building the kernel}
+To build the kernel, just execute make kernel.
+
+
+\end{document}
